@@ -9,6 +9,7 @@
 #include "frontend/container/rpx.h"
 #include "backend/emitter.h"
 #include "backend/dispatch.h"
+#include "backend/option_sites.h"
 #include "backend/codegen.h"
 #include "backend/variant_output.h"
 #include "backend/symbols.h"
@@ -1509,6 +1510,7 @@ int emit_rel_directory(const char* input_dir, const char* output_root,
             goto done;
         if (!check_duplicate_rel_module(items, i, items[i].rel.module_id))
             goto done;
+        option_sites_resolve_rel(paths.paths[i], items[i].rel.base_address);
 
         map_entries[i].module_id = items[i].rel.module_id;
         map_entries[i].rel = &items[i].rel;

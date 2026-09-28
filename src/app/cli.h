@@ -18,6 +18,7 @@ typedef struct {
     const char* llvm_targets;
     const char* profile_generate_path;
     const char* profile_use_path;
+    const char* option_sites_path;
     DolRecompCPU cpu;
     DolRecompBackend backend;
     u32 jobs;

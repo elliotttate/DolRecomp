@@ -156,6 +156,7 @@ target_link_libraries(dr_analysis PUBLIC dr_frontend)
 
 add_library(dr_backend STATIC
     src/backend/c_cfg.c
+    src/backend/option_sites.c
     src/backend/emitter.c
     src/backend/dispatch.c
     src/backend/codegen.c
@@ -253,6 +254,10 @@ add_test(NAME dispatch COMMAND test_dispatch)
 add_executable(test_module_abi tests/test_module_abi.c)
 target_link_libraries(test_module_abi PRIVATE dr_backend dr_cpu)
 add_test(NAME module_abi COMMAND test_module_abi)
+
+add_executable(test_option_sites tests/test_option_sites.c)
+target_link_libraries(test_option_sites PRIVATE dr_backend)
+add_test(NAME option_sites COMMAND test_option_sites)
 
 add_executable(test_c_cfg tests/test_c_cfg.c)
 target_link_libraries(test_c_cfg PRIVATE dr_backend)

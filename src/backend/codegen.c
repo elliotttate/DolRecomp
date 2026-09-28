@@ -1,5 +1,6 @@
 #include "backend/codegen.h"
 #include "backend/emitter.h"
+#include "backend/option_sites.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,6 +35,11 @@ int emit_chunk_file(const ChunkJob* job) {
 
     fprintf(chunk, "// DolRecomp output\n");
     fprintf(chunk, "#include \"../%s\"\n\n", job->include_name);
+    if (option_sites_in_range(job->func_addr, job->func_addr + job->count * 4u)) {
+        // The runtime owns the switches and the native hooks.
+        fprintf(chunk, "extern volatile unsigned char dolrecomp_option_flags[256];\n");
+        fprintf(chunk, "u32 dolrecomp_native_hook(CPUState* ctx, u32 id);\n\n");
+    }
     if (!emit_function(chunk, job->insts, job->count, job->func_addr)) {
         fclose(chunk);
         remove(job->path);

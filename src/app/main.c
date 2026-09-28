@@ -12,6 +12,7 @@
 #include "backend/emitter.h"
 #include "analysis/symbol_map.h"
 #include <stdio.h>
+#include "backend/option_sites.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -26,6 +27,14 @@ int main(int argc, char** argv) {
         return 0;
     if (opts.setup_mode)
         return run_setup() ? 0 : 1;
+    if (opts.option_sites_path) {
+        if (opts.backend != DOLRECOMP_BACKEND_C) {
+            fprintf(stderr, "error: --option-sites needs the C backend\n");
+            return 1;
+        }
+        if (!option_sites_load(opts.option_sites_path))
+            return 1;
+    }
 
     const char* input_path  = opts.input_path;
     const char* title_id_arg = opts.title_id_arg;
@@ -163,6 +172,7 @@ int main(int argc, char** argv) {
 
         rel_print_info(&rel, game_name);
         printf("cpu: %s\n", cpu_display_name(effective_cpu));
+        option_sites_resolve_rel(input_path, rel.base_address);
 
         if (!output_arg) {
             printf("\ngenerating code...\n");
@@ -203,6 +213,7 @@ int main(int argc, char** argv) {
     DOLFile dol;
     if (!dol_load(&dol, input_path))
         return 1;
+    option_sites_resolve_dol();
     dol_print_info(&dol, game_name);
     printf("cpu: %s\n", cpu_display_name(effective_cpu));
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "backend/c_cfg.h"
+#include "backend/option_sites.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -296,6 +297,28 @@ bool c_function_cfg_build(CFunctionCFG* cfg, const PPCInst* insts, u32 count,
         }
     }
 
+    // An option site (option_sites.h) is a block of its own, so either of its
+    // behaviours starts and ends on a block boundary, and a local branch it
+    // substitutes lands on a block start.
+    for (u32 i = 0; i < count; ++i) {
+        const OptionSite* site = option_site_at(insts[i].address);
+        PPCInst alternative;
+        if (!site)
+            continue;
+        cfg->leaders[i] = 1;
+        if (i + 1u < count)
+            cfg->leaders[i + 1u] = 1;
+        if (!option_site_alternative(site, &insts[i], &alternative))
+            continue;
+        if (alternative.lk && i + 1u < count)
+            cfg->return_targets[i + 1u] = 1;
+        if ((alternative.op == PPC_OP_B || alternative.op == PPC_OP_BC) &&
+            c_function_cfg_contains(cfg, function_address,
+                                    alternative.branch_target)) {
+            cfg->leaders[(alternative.branch_target - function_address) / 4u] = 1;
+        }
+    }
+
     for (u32 i = 0; i < count; ++i) {
         if (!cfg->leaders[i])
             continue;
@@ -315,6 +338,10 @@ bool c_function_cfg_build(CFunctionCFG* cfg, const PPCInst* insts, u32 count,
         }
         u32 first =
             (insts[last].branch_target - function_address) / 4u;
+        // A loop with an option site stays in the flat function, which is
+        // the one that emits sites.
+        if (option_sites_in_range(insts[first].address, insts[last].address + 4u))
+            continue;
         for (u32 i = first; i <= last; ++i) {
             if (instruction_is_pc_transparent(&insts[i]))
                 cfg->materialize_pc[i] = 0;

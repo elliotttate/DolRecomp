@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 ExpansionPak
 
+#include "backend/option_sites.h"
 #include "emitter.h"
 #include "backend/c_cfg.h"
 
@@ -2167,6 +2168,19 @@ static void emit_counted_loop(FILE* out, const PPCInst* insts,
     fprintf(out, "}\n\n");
 }
 
+// An option site's hook (option_sites.h): the runtime's native code runs with
+// the guest state as it is at this point and either lets the block go on or
+// names the guest address to continue at.
+static void emit_option_hook(FILE* out, const OptionSite* site) {
+    fprintf(out, "    if (dolrecomp_option_flags[%uu]) {\n", site->option);
+    fprintf(out, "        const u32 hook_next = dolrecomp_native_hook(ctx, %uu);\n", site->value);
+    fprintf(out, "        if (hook_next != 0u) {\n");
+    fprintf(out, "            ctx->pc = hook_next;\n");
+    fprintf(out, "            return;\n");
+    fprintf(out, "        }\n");
+    fprintf(out, "    }\n");
+}
+
 static void emit_flat_function(FILE* out, const PPCInst* insts, u32 count,
                                const CFunctionCFG* cfg, u32 func_addr,
                                u32 func_end, bool has_local_returns,
@@ -2319,10 +2333,27 @@ static void emit_flat_function(FILE* out, const PPCInst* insts, u32 count,
         if (!fast && !charged_with_leader)
             emit_precise_instruction_charge(out, &insts[i]);
         emit_cycle_observation_suffix(out, insts, cfg, i);
+        const OptionSite* site =
+            insts[i].embedded_data ? NULL : option_site_at(insts[i].address);
+        PPCInst alternative;
+        const bool substitutes =
+            site && option_site_alternative(site, &insts[i], &alternative);
+        if (site && site->kind == OPTION_SITE_HOOK)
+            emit_option_hook(out, site);
+        if (substitutes) {
+            fprintf(out, "    if (dolrecomp_option_flags[%uu]) {\n", site->option);
+            emit_instruction_with_range(out, &alternative, func_addr, func_end,
+                                        false, has_local_returns, "");
+            fprintf(out, "    } else {\n");
+        }
         emit_instruction_with_range(
             out, &insts[i], func_addr, func_end,
             c_function_cfg_can_loop_directly(cfg, insts, func_addr, i),
             has_local_returns, "");
+        if (substitutes)
+            fprintf(out, "    }\n");
+        if (site && site->kind == OPTION_SITE_HOOK_AFTER)
+            emit_option_hook(out, site);
         if (!fast)
             emit_cycle_observation_reconcile(out, &insts[i]);
     }
